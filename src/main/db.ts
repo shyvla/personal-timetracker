@@ -128,8 +128,7 @@ function validateRange(start: number, end: number): void {
   if (end <= start) throw new Error('End time must be after the start time')
 }
 
-export function listEntries(day: string): Entry[] {
-  const database = getDb()
+function attachTags(database: BetterSqlite3.Database, rows: EntryRow[]): Entry[] {
   const tagStmt = database.prepare(
     `SELECT t.id, t.name, t.color
        FROM entry_tags et
@@ -137,11 +136,25 @@ export function listEntries(day: string): Entry[] {
       WHERE et.entry_id = ?
       ORDER BY et.position`
   )
-  return dayRows(database, day).map((r) => {
+  return rows.map((r) => {
     const entry = rowToEntry(r)
     entry.tags = tagStmt.all(r.id) as Tag[]
     return entry
   })
+}
+
+export function listEntries(day: string): Entry[] {
+  const database = getDb()
+  return attachTags(database, dayRows(database, day))
+}
+
+/** All entries across every day, ordered by day then position (for export). */
+export function listAllEntries(): Entry[] {
+  const database = getDb()
+  const rows = database
+    .prepare('SELECT * FROM entries ORDER BY day, position')
+    .all() as EntryRow[]
+  return attachTags(database, rows)
 }
 
 /** Append a new block. The first block of a day needs a start; others chain. */

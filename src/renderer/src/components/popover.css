@@ -16,3 +16,75 @@
   padding: 16px;
   color: var(--ink);
 }
+
+/* ---- Shared popover UI ---- */
+.popover__title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.popover__error {
+  margin: 4px 0 10px;
+  padding: 7px 10px;
+  background: #fdecea;
+  color: #8a1c15;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+.popover__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+.popover__actions-right {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.btn--ghost {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+.btn--ghost:hover {
+  background: #f2f2f2;
+}
+.btn--danger {
+  color: #b3261e;
+  border-color: #e6b4b0;
+}
+.btn--primary {
+  background: #111;
+  color: #fff;
+}
+.btn--primary:hover {
+  background: #333;
+}
+.btn--primary:disabled {
+  background: #bbb;
+  cursor: not-allowed;
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.radio input {
+  accent-color: #111;
+}

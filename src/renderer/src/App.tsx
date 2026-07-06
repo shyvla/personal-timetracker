@@ -8,6 +8,7 @@ import DoingCell from './components/DoingCell'
 import TagCell from './components/TagCell'
 import TagPopover from './components/TagPopover'
 import CalendarPopover from './components/CalendarPopover'
+import ExportPopover from './components/ExportPopover'
 import './styles/App.css'
 
 const MIN_ROWS = 8
@@ -40,6 +41,7 @@ export default function App(): React.JSX.Element {
     null
   )
   const [calendarAnchor, setCalendarAnchor] = useState<DOMRect | null>(null)
+  const [exportAnchor, setExportAnchor] = useState<DOMRect | null>(null)
   const [ready, setReady] = useState(false)
 
   // One-time init: DB health, preferences, and the tag catalog.
@@ -235,7 +237,11 @@ export default function App(): React.JSX.Element {
             <CalendarIcon />
             <span className="datepill__date">{formatDisplayDate(day)}</span>
           </button>
-          <button className="export-btn" type="button">
+          <button
+            className="export-btn"
+            type="button"
+            onClick={(e) => setExportAnchor(e.currentTarget.getBoundingClientRect())}
+          >
             Export
           </button>
         </div>
@@ -351,6 +357,14 @@ export default function App(): React.JSX.Element {
           today={todayISO()}
           onSelect={selectDay}
           onClose={() => setCalendarAnchor(null)}
+        />
+      )}
+
+      {exportAnchor && (
+        <ExportPopover
+          anchor={exportAnchor}
+          day={day}
+          onClose={() => setExportAnchor(null)}
         />
       )}
     </div>

@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Preferences, DbStatus, Entry, Tag } from '../shared/types'
+import type {
+  Preferences,
+  DbStatus,
+  Entry,
+  Tag,
+  ExportOptions,
+  ExportResult
+} from '../shared/types'
 
 const api = {
   dbStatus: (): Promise<DbStatus> => ipcRenderer.invoke('db:status'),
@@ -22,7 +29,9 @@ const api = {
   setTagColor: (id: number, color: string): Promise<Tag[]> =>
     ipcRenderer.invoke('tags:setColor', id, color),
   setEntryTags: (entryId: number, tagIds: number[]): Promise<Entry[]> =>
-    ipcRenderer.invoke('entries:setTags', entryId, tagIds)
+    ipcRenderer.invoke('entries:setTags', entryId, tagIds),
+  runExport: (opts: ExportOptions): Promise<ExportResult> =>
+    ipcRenderer.invoke('export:run', opts)
 }
 
 export type Api = typeof api

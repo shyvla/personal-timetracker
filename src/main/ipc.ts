@@ -1,9 +1,11 @@
-import { ipcMain } from 'electron'
+import { ipcMain, dialog } from 'electron'
+import { writeFileSync } from 'fs'
 import {
   getDb,
   getPreferences,
   setPreferences,
   listEntries,
+  listAllEntries,
   createEntry,
   updateEntryTime,
   updateEntryDoing,
@@ -13,7 +15,15 @@ import {
   setTagColor,
   setEntryTags
 } from './db'
-import type { Preferences, DbStatus, Entry, Tag } from '../shared/types'
+import { toJSON, toCSV } from './export'
+import type {
+  Preferences,
+  DbStatus,
+  Entry,
+  Tag,
+  ExportOptions,
+  ExportResult
+} from '../shared/types'
 
 /** Register all IPC handlers. Called once after app is ready. */
 export function registerIpc(): void {
@@ -65,4 +75,24 @@ export function registerIpc(): void {
   ipcMain.handle('entries:setTags', (_e, entryId: number, tagIds: number[]): Entry[] =>
     setEntryTags(entryId, tagIds)
   )
+
+  ipcMain.handle('export:run', async (_e, opts: ExportOptions): Promise<ExportResult> => {
+    try {
+      const entries = opts.scope === 'all' ? listAllEntries() : listEntries(opts.day)
+      const display = getPreferences().display
+      const content =
+        opts.format === 'json' ? toJSON(entries, display) : toCSV(entries, display)
+      const base =
+        opts.scope === 'all' ? 'timetracker-all' : `timetracker-${opts.day}`
+      const result = await dialog.showSaveDialog({
+        defaultPath: `${base}.${opts.format}`,
+        filters: [{ name: opts.format.toUpperCase(), extensions: [opts.format] }]
+      })
+      if (result.canceled || !result.filePath) return { canceled: true }
+      writeFileSync(result.filePath, content, 'utf-8')
+      return { canceled: false, path: result.filePath }
+    } catch (err) {
+      return { canceled: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
 }

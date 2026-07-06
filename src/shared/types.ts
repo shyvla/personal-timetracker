@@ -43,3 +43,18 @@ export interface DbStatus {
   ok: boolean
   error?: string
 }
+
+export type ExportFormat = 'json' | 'csv'
+export type ExportScope = 'day' | 'all'
+
+export interface ExportOptions {
+  format: ExportFormat
+  scope: ExportScope
+  day: string
+}
+
+export interface ExportResult {
+  canceled: boolean
+  path?: string
+  error?: string
+}

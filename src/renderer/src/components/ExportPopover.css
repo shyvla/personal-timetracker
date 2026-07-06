@@ -1,0 +1,32 @@
+.popover.export-popover {
+  width: 300px;
+}
+
+.export-group {
+  border: none;
+  padding: 0;
+  margin: 0 0 14px;
+}
+.export-group legend {
+  font-size: 12px;
+  font-weight: 700;
+  color: #666;
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.export-status {
+  margin: 2px 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.export-status--ok {
+  background: #e9f6ec;
+  color: #1c6b34;
+}
+.export-status--err {
+  background: #fdecea;
+  color: #8a1c15;
+}
