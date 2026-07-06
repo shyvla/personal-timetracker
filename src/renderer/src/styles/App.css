@@ -90,16 +90,27 @@
 }
 
 /* ---- Table ---- */
-/* Hug content when short; when it can't fit the sheet, cap and scroll the
-   rows internally (the sticky header stays put) instead of the whole page. */
+/* Non-scrolling rounded frame; the inner scroll area holds the rows and only
+   scrolls when they can't fit, so the sticky header sits flush at the top with
+   no gap showing through. */
 .table {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--table-shell);
   border-radius: var(--radius-table);
   padding: 8px;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+}
+
+.table__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--sheet-bg);
+  border-radius: 15px;
 }
 
 .table__head,
@@ -112,7 +123,7 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--table-shell);
+  background: var(--sheet-bg);
   border-bottom: 1px solid var(--line-strong);
 }
 

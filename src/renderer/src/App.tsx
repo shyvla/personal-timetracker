@@ -11,8 +11,6 @@ import CalendarPopover from './components/CalendarPopover'
 import ExportPopover from './components/ExportPopover'
 import './styles/App.css'
 
-const MIN_ROWS = 8
-
 interface PopoverState {
   anchor: DOMRect
   kind: 'new' | 'edit'
@@ -211,8 +209,6 @@ export default function App(): React.JSX.Element {
     }
   }
 
-  const padCount = Math.max(0, MIN_ROWS - entries.length - 1)
-
   return (
     <div className="app">
       <div className="titlebar">Main Page</div>
@@ -247,6 +243,7 @@ export default function App(): React.JSX.Element {
         </div>
 
         <div className="table" role="table" aria-label="Time entries">
+          <div className="table__scroll" role="rowgroup">
           <div className="table__head" role="row">
             <div className="th th--time" role="columnheader">
               Time
@@ -293,14 +290,7 @@ export default function App(): React.JSX.Element {
               <div className="td td--tag" role="cell" />
             </div>
           )}
-
-          {Array.from({ length: padCount }).map((_, i) => (
-            <div className="tr tr--empty" role="row" key={`pad-${i}`}>
-              <div className="td td--time" role="cell" />
-              <div className="td td--doing" role="cell" />
-              <div className="td td--tag" role="cell" />
-            </div>
-          ))}
+          </div>
         </div>
       </main>
 
