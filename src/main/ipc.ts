@@ -7,9 +7,13 @@ import {
   createEntry,
   updateEntryTime,
   updateEntryDoing,
-  deleteEntry
+  deleteEntry,
+  listTags,
+  createTag,
+  setTagColor,
+  setEntryTags
 } from './db'
-import type { Preferences, DbStatus, Entry } from '../shared/types'
+import type { Preferences, DbStatus, Entry, Tag } from '../shared/types'
 
 /** Register all IPC handlers. Called once after app is ready. */
 export function registerIpc(): void {
@@ -47,4 +51,18 @@ export function registerIpc(): void {
   )
 
   ipcMain.handle('entries:delete', (_e, id: number): Entry[] => deleteEntry(id))
+
+  ipcMain.handle('tags:list', (): Tag[] => listTags())
+
+  ipcMain.handle('tags:create', (_e, name: string, color?: string): Tag =>
+    createTag(name, color)
+  )
+
+  ipcMain.handle('tags:setColor', (_e, id: number, color: string): Tag[] =>
+    setTagColor(id, color)
+  )
+
+  ipcMain.handle('entries:setTags', (_e, entryId: number, tagIds: number[]): Entry[] =>
+    setEntryTags(entryId, tagIds)
+  )
 }

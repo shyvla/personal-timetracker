@@ -9,6 +9,8 @@ import {
   toHHMM,
   parseHHMM
 } from '../lib/time'
+import { panelStyle } from '../lib/popover'
+import './popover.css'
 import './TimePopover.css'
 
 export interface TimePopoverProps {
@@ -78,26 +80,15 @@ export default function TimePopover(props: TimePopoverProps): React.JSX.Element 
     if (end <= next) setEnd(Math.min(next + step, DAY_MINUTES))
   }
 
-  // Place the panel below the anchor when there's room, otherwise above it, and
-  // cap its height to the available space so tall content (expanded prefs) scrolls
-  // inside the panel instead of overflowing off-screen.
-  const margin = 12
-  const gap = 6
-  const spaceBelow = window.innerHeight - anchor.bottom - margin
-  const spaceAbove = anchor.top - margin
-  const placeBelow = spaceBelow >= spaceAbove
-  const panelStyle: React.CSSProperties = {
-    left: Math.max(margin, Math.min(anchor.left, window.innerWidth - 320 - margin)),
-    maxHeight: Math.max(placeBelow ? spaceBelow : spaceAbove, 160),
-    ...(placeBelow
-      ? { top: anchor.bottom + gap }
-      : { bottom: window.innerHeight - anchor.top + gap })
-  }
-
   return (
     <>
       <div className="popover-backdrop" onClick={props.onClose} />
-      <div className="popover" style={panelStyle} role="dialog" aria-label="Set time block">
+      <div
+        className="popover"
+        style={panelStyle(anchor)}
+        role="dialog"
+        aria-label="Set time block"
+      >
         <div className="popover__title">{isFirst ? 'Time block' : 'End time'}</div>
 
         {isFirst ? (

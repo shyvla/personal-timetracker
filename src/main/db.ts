@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { app } from 'electron'
 import type BetterSqlite3 from 'better-sqlite3'
-import { DEFAULT_PREFERENCES, type Preferences, type Entry } from '../shared/types'
+import { DEFAULT_PREFERENCES, type Preferences, type Entry, type Tag } from '../shared/types'
 
 // better-sqlite3 is a native module. We require it lazily so that a failure to
 // load (e.g. the native binary hasn't been rebuilt for Electron's ABI yet) does
@@ -129,7 +129,19 @@ function validateRange(start: number, end: number): void {
 }
 
 export function listEntries(day: string): Entry[] {
-  return dayRows(getDb(), day).map(rowToEntry)
+  const database = getDb()
+  const tagStmt = database.prepare(
+    `SELECT t.id, t.name, t.color
+       FROM entry_tags et
+       JOIN tags t ON t.id = et.tag_id
+      WHERE et.entry_id = ?
+      ORDER BY et.position`
+  )
+  return dayRows(database, day).map((r) => {
+    const entry = rowToEntry(r)
+    entry.tags = tagStmt.all(r.id) as Tag[]
+    return entry
+  })
 }
 
 /** Append a new block. The first block of a day needs a start; others chain. */
@@ -224,4 +236,87 @@ export function deleteEntry(id: number): Entry[] {
   })
   tx()
   return listEntries(day)
+}
+
+// ---- Tags ----
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sn = s / 100
+  const ln = l / 100
+  const c = (1 - Math.abs(2 * ln - 1)) * sn
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = ln - c / 2
+  const [r, g, b] =
+    h < 60
+      ? [c, x, 0]
+      : h < 120
+        ? [x, c, 0]
+        : h < 180
+          ? [0, c, x]
+          : h < 240
+            ? [0, x, c]
+            : h < 300
+              ? [x, 0, c]
+              : [c, 0, x]
+  const to = (v: number): string =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, '0')
+  return `#${to(r)}${to(g)}${to(b)}`
+}
+
+/** A pleasant, light, randomly-hued color for a new tag. */
+function randomColor(): string {
+  const h = Math.floor(Math.random() * 360)
+  const s = 60 + Math.floor(Math.random() * 20) // 60–80%
+  const l = 72 + Math.floor(Math.random() * 8) // 72–80%
+  return hslToHex(h, s, l)
+}
+
+export function listTags(): Tag[] {
+  return getDb()
+    .prepare('SELECT id, name, color FROM tags ORDER BY name COLLATE NOCASE')
+    .all() as Tag[]
+}
+
+/** Create a tag (random color if unspecified), or return the existing one by name. */
+export function createTag(name: string, color?: string): Tag {
+  const database = getDb()
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('Tag name cannot be empty')
+  const existing = database
+    .prepare('SELECT id, name, color FROM tags WHERE name = ? COLLATE NOCASE')
+    .get(trimmed) as Tag | undefined
+  if (existing) return existing
+  const chosen = color ?? randomColor()
+  const info = database
+    .prepare('INSERT INTO tags (name, color) VALUES (?, ?)')
+    .run(trimmed, chosen)
+  return { id: Number(info.lastInsertRowid), name: trimmed, color: chosen }
+}
+
+/** Recolor a tag; the change applies everywhere the tag is used. */
+export function setTagColor(id: number, color: string): Tag[] {
+  getDb().prepare('UPDATE tags SET color = ? WHERE id = ?').run(color, id)
+  return listTags()
+}
+
+/** Replace an entry's tags with the given ordered list (left-to-right). */
+export function setEntryTags(entryId: number, tagIds: number[]): Entry[] {
+  const database = getDb()
+  const row = database.prepare('SELECT day FROM entries WHERE id = ?').get(entryId) as
+    | { day: string }
+    | undefined
+  if (!row) throw new Error('Entry not found')
+
+  const del = database.prepare('DELETE FROM entry_tags WHERE entry_id = ?')
+  const ins = database.prepare(
+    'INSERT INTO entry_tags (entry_id, tag_id, position) VALUES (?, ?, ?)'
+  )
+  const tx = database.transaction(() => {
+    del.run(entryId)
+    tagIds.forEach((tagId, i) => ins.run(entryId, tagId, i))
+  })
+  tx()
+  return listEntries(row.day)
 }

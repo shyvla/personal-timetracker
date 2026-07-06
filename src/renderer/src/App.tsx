@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import type { Entry, Preferences } from '../../shared/types'
+import type { Entry, Preferences, Tag } from '../../shared/types'
 import { DEFAULT_PREFERENCES } from '../../shared/types'
 import { DAY_MINUTES, formatRange, incrementStep } from './lib/time'
 import { formatDisplayDate, todayISO } from './lib/date'
 import TimePopover from './components/TimePopover'
 import DoingCell from './components/DoingCell'
+import TagCell from './components/TagCell'
+import TagPopover from './components/TagPopover'
 import './styles/App.css'
 
 const MIN_ROWS = 8
@@ -28,10 +30,14 @@ function ipcMessage(err: unknown): string {
 export default function App(): React.JSX.Element {
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFERENCES)
   const [entries, setEntries] = useState<Entry[]>([])
+  const [tags, setTags] = useState<Tag[]>([])
   const [day] = useState<string>(todayISO())
   const [dbError, setDbError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [popover, setPopover] = useState<PopoverState | null>(null)
+  const [tagPopover, setTagPopover] = useState<{ anchor: DOMRect; entryId: number } | null>(
+    null
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -43,13 +49,15 @@ export default function App(): React.JSX.Element {
           setDbError(status.error ?? 'Database unavailable')
           return
         }
-        const [p, e] = await Promise.all([
+        const [p, e, t] = await Promise.all([
           window.api.getPreferences(),
-          window.api.listEntries(day)
+          window.api.listEntries(day),
+          window.api.listTags()
         ])
         if (cancelled) return
         setPrefs(p)
         setEntries(e)
+        setTags(t)
       } catch (err) {
         if (!cancelled) setDbError(ipcMessage(err))
       }
@@ -126,6 +134,44 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  function openTags(anchor: DOMRect, entry: Entry): void {
+    setActionError(null)
+    setTagPopover({ anchor, entryId: entry.id })
+  }
+
+  async function toggleTag(entry: Entry, tagId: number): Promise<void> {
+    const ids = entry.tags.map((t) => t.id)
+    const next = ids.includes(tagId) ? ids.filter((i) => i !== tagId) : [...ids, tagId]
+    try {
+      const list = await window.api.setEntryTags(entry.id, next)
+      setEntries(list)
+    } catch (err) {
+      setActionError(ipcMessage(err))
+    }
+  }
+
+  async function createTagFor(entry: Entry, name: string): Promise<void> {
+    try {
+      const tag = await window.api.createTag(name)
+      setTags(await window.api.listTags())
+      const ids = entry.tags.map((t) => t.id)
+      if (!ids.includes(tag.id)) {
+        setEntries(await window.api.setEntryTags(entry.id, [...ids, tag.id]))
+      }
+    } catch (err) {
+      setActionError(ipcMessage(err))
+    }
+  }
+
+  async function recolorTag(tagId: number, color: string): Promise<void> {
+    try {
+      setTags(await window.api.setTagColor(tagId, color))
+      setEntries(await window.api.listEntries(day))
+    } catch (err) {
+      setActionError(ipcMessage(err))
+    }
+  }
+
   async function handleSavePrefs(patch: Partial<Preferences>): Promise<void> {
     try {
       const p = await window.api.setPreferences(patch)
@@ -190,7 +236,9 @@ export default function App(): React.JSX.Element {
                   onSave={(text) => handleSaveDoing(entry.id, text)}
                 />
               </div>
-              <div className="td td--tag" role="cell" />
+              <div className="td td--tag" role="cell">
+                <TagCell entry={entry} onOpen={openTags} />
+              </div>
             </div>
           ))}
 
@@ -242,6 +290,27 @@ export default function App(): React.JSX.Element {
           }}
         />
       )}
+
+      {tagPopover &&
+        (() => {
+          const tagEntry = entries.find((e) => e.id === tagPopover.entryId)
+          if (!tagEntry) return null
+          return (
+            <TagPopover
+              anchor={tagPopover.anchor}
+              entry={tagEntry}
+              allTags={tags}
+              error={actionError}
+              onToggle={(tagId) => toggleTag(tagEntry, tagId)}
+              onCreate={(name) => createTagFor(tagEntry, name)}
+              onRecolor={recolorTag}
+              onClose={() => {
+                setTagPopover(null)
+                setActionError(null)
+              }}
+            />
+          )
+        })()}
     </div>
   )
 }

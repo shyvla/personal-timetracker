@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Preferences, DbStatus, Entry } from '../shared/types'
+import type { Preferences, DbStatus, Entry, Tag } from '../shared/types'
 
 const api = {
   dbStatus: (): Promise<DbStatus> => ipcRenderer.invoke('db:status'),
@@ -15,7 +15,14 @@ const api = {
   ): Promise<Entry[]> => ipcRenderer.invoke('entries:updateTime', id, patch),
   updateEntryDoing: (id: number, doing: string): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:updateDoing', id, doing),
-  deleteEntry: (id: number): Promise<Entry[]> => ipcRenderer.invoke('entries:delete', id)
+  deleteEntry: (id: number): Promise<Entry[]> => ipcRenderer.invoke('entries:delete', id),
+  listTags: (): Promise<Tag[]> => ipcRenderer.invoke('tags:list'),
+  createTag: (name: string, color?: string): Promise<Tag> =>
+    ipcRenderer.invoke('tags:create', name, color),
+  setTagColor: (id: number, color: string): Promise<Tag[]> =>
+    ipcRenderer.invoke('tags:setColor', id, color),
+  setEntryTags: (entryId: number, tagIds: number[]): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:setTags', entryId, tagIds)
 }
 
 export type Api = typeof api
