@@ -1,0 +1,34 @@
+/* The view and the editor share typography/box so height doesn't jump on edit. */
+.doing-view,
+.doing-input {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--ink);
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.doing-view {
+  cursor: text;
+  min-height: 1.45em;
+  outline: none;
+}
+.doing-view:focus {
+  outline: none;
+}
+.doing-view__placeholder {
+  color: var(--muted);
+}
+
+.doing-input {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+}

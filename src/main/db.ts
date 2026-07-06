@@ -187,6 +187,17 @@ export function updateEntryTime(
   return listEntries(entry.day)
 }
 
+/** Update the free-text "Doing" description for a block. */
+export function updateEntryDoing(id: number, doing: string): Entry[] {
+  const database = getDb()
+  const row = database.prepare('SELECT day FROM entries WHERE id = ?').get(id) as
+    | { day: string }
+    | undefined
+  if (!row) throw new Error('Entry not found')
+  database.prepare('UPDATE entries SET doing = ? WHERE id = ?').run(doing, id)
+  return listEntries(row.day)
+}
+
 /** Remove a block, then renumber positions and re-chain the remaining blocks. */
 export function deleteEntry(id: number): Entry[] {
   const database = getDb()

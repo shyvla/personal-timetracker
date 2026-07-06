@@ -13,6 +13,8 @@ const api = {
     id: number,
     patch: { startMin?: number; endMin?: number }
   ): Promise<Entry[]> => ipcRenderer.invoke('entries:updateTime', id, patch),
+  updateEntryDoing: (id: number, doing: string): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:updateDoing', id, doing),
   deleteEntry: (id: number): Promise<Entry[]> => ipcRenderer.invoke('entries:delete', id)
 }
 

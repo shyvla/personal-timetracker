@@ -6,6 +6,7 @@ import {
   listEntries,
   createEntry,
   updateEntryTime,
+  updateEntryDoing,
   deleteEntry
 } from './db'
 import type { Preferences, DbStatus, Entry } from '../shared/types'
@@ -39,6 +40,10 @@ export function registerIpc(): void {
     'entries:updateTime',
     (_e, id: number, patch: { startMin?: number; endMin?: number }): Entry[] =>
       updateEntryTime(id, patch)
+  )
+
+  ipcMain.handle('entries:updateDoing', (_e, id: number, doing: string): Entry[] =>
+    updateEntryDoing(id, doing)
   )
 
   ipcMain.handle('entries:delete', (_e, id: number): Entry[] => deleteEntry(id))

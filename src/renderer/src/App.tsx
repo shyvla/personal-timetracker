@@ -4,6 +4,7 @@ import { DEFAULT_PREFERENCES } from '../../shared/types'
 import { DAY_MINUTES, formatRange, incrementStep } from './lib/time'
 import { formatDisplayDate, todayISO } from './lib/date'
 import TimePopover from './components/TimePopover'
+import DoingCell from './components/DoingCell'
 import './styles/App.css'
 
 const MIN_ROWS = 8
@@ -116,6 +117,15 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  async function handleSaveDoing(id: number, text: string): Promise<void> {
+    try {
+      const list = await window.api.updateEntryDoing(id, text)
+      setEntries(list)
+    } catch (err) {
+      setActionError(ipcMessage(err))
+    }
+  }
+
   async function handleSavePrefs(patch: Partial<Preferences>): Promise<void> {
     try {
       const p = await window.api.setPreferences(patch)
@@ -175,7 +185,10 @@ export default function App(): React.JSX.Element {
                 {formatRange(entry.startMin, entry.endMin, prefs.display)}
               </button>
               <div className="td td--doing" role="cell">
-                {entry.doing}
+                <DoingCell
+                  value={entry.doing}
+                  onSave={(text) => handleSaveDoing(entry.id, text)}
+                />
               </div>
               <div className="td td--tag" role="cell" />
             </div>
