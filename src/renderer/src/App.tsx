@@ -290,6 +290,10 @@ export default function App(): React.JSX.Element {
               <div className="td td--tag" role="cell" />
             </div>
           )}
+
+          {/* Fills leftover space with ruled empty rows; collapses to 0 (no
+              scroll) once real rows fill the table. */}
+          <div className="table__filler" aria-hidden="true" />
           </div>
         </div>
       </main>

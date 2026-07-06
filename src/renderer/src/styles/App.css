@@ -109,8 +109,29 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--sheet-bg);
   border-radius: 15px;
+}
+
+/* Ruled empty space below the last row: horizontal separators every row-height
+   plus the two column dividers, matching the 220px / 1fr / 300px grid. Grows to
+   fill free space, shrinks to nothing when rows overflow (so it never scrolls). */
+.table__filler {
+  flex: 1 1 auto;
+  min-height: 0;
+  background-image: linear-gradient(to bottom, transparent 63px, var(--line) 63px),
+    linear-gradient(var(--line), var(--line)), linear-gradient(var(--line), var(--line));
+  background-size:
+    100% 64px,
+    1px 100%,
+    1px 100%;
+  background-position:
+    0 0,
+    220px 0,
+    calc(100% - 300px) 0;
+  background-repeat: repeat, no-repeat, no-repeat;
 }
 
 .table__head,
@@ -120,6 +141,7 @@
 }
 
 .table__head {
+  flex: 0 0 auto;
   position: sticky;
   top: 0;
   z-index: 2;
@@ -138,6 +160,7 @@
 }
 
 .tr {
+  flex: 0 0 auto;
   background: var(--sheet-bg);
   border-top: 1px solid var(--line);
 }
