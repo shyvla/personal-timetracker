@@ -7,6 +7,7 @@ import TimePopover from './components/TimePopover'
 import DoingCell from './components/DoingCell'
 import TagCell from './components/TagCell'
 import TagPopover from './components/TagPopover'
+import CalendarPopover from './components/CalendarPopover'
 import './styles/App.css'
 
 const MIN_ROWS = 8
@@ -31,14 +32,17 @@ export default function App(): React.JSX.Element {
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFERENCES)
   const [entries, setEntries] = useState<Entry[]>([])
   const [tags, setTags] = useState<Tag[]>([])
-  const [day] = useState<string>(todayISO())
+  const [day, setDay] = useState<string>(todayISO())
   const [dbError, setDbError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [popover, setPopover] = useState<PopoverState | null>(null)
   const [tagPopover, setTagPopover] = useState<{ anchor: DOMRect; entryId: number } | null>(
     null
   )
+  const [calendarAnchor, setCalendarAnchor] = useState<DOMRect | null>(null)
+  const [ready, setReady] = useState(false)
 
+  // One-time init: DB health, preferences, and the tag catalog.
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -49,15 +53,14 @@ export default function App(): React.JSX.Element {
           setDbError(status.error ?? 'Database unavailable')
           return
         }
-        const [p, e, t] = await Promise.all([
+        const [p, t] = await Promise.all([
           window.api.getPreferences(),
-          window.api.listEntries(day),
           window.api.listTags()
         ])
         if (cancelled) return
         setPrefs(p)
-        setEntries(e)
         setTags(t)
+        setReady(true)
       } catch (err) {
         if (!cancelled) setDbError(ipcMessage(err))
       }
@@ -65,7 +68,24 @@ export default function App(): React.JSX.Element {
     return () => {
       cancelled = true
     }
-  }, [day])
+  }, [])
+
+  // Load entries whenever the selected day changes.
+  useEffect(() => {
+    if (!ready) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const e = await window.api.listEntries(day)
+        if (!cancelled) setEntries(e)
+      } catch (err) {
+        if (!cancelled) setActionError(ipcMessage(err))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [day, ready])
 
   function openNew(e: React.MouseEvent<HTMLElement>): void {
     const isFirst = entries.length === 0
@@ -134,6 +154,14 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  function selectDay(iso: string): void {
+    setPopover(null)
+    setTagPopover(null)
+    setCalendarAnchor(null)
+    setActionError(null)
+    setDay(iso)
+  }
+
   function openTags(anchor: DOMRect, entry: Entry): void {
     setActionError(null)
     setTagPopover({ anchor, entryId: entry.id })
@@ -199,7 +227,11 @@ export default function App(): React.JSX.Element {
         <div className="sheet__divider" />
 
         <div className="sheet__toolbar">
-          <button className="datepill" type="button">
+          <button
+            className="datepill"
+            type="button"
+            onClick={(e) => setCalendarAnchor(e.currentTarget.getBoundingClientRect())}
+          >
             <CalendarIcon />
             <span className="datepill__date">{formatDisplayDate(day)}</span>
           </button>
@@ -311,6 +343,16 @@ export default function App(): React.JSX.Element {
             />
           )
         })()}
+
+      {calendarAnchor && (
+        <CalendarPopover
+          anchor={calendarAnchor}
+          selected={day}
+          today={todayISO()}
+          onSelect={selectDay}
+          onClose={() => setCalendarAnchor(null)}
+        />
+      )}
     </div>
   )
 }

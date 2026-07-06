@@ -15,3 +15,32 @@ export function formatDisplayDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   return `${m}/${d}/${y}`
 }
+
+/** Build "YYYY-MM-DD" from parts (month is 0-based, matching Date). */
+export function isoFromParts(year: number, month0: number, day: number): string {
+  return `${year}-${String(month0 + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+export function daysInMonth(year: number, month0: number): number {
+  return new Date(year, month0 + 1, 0).getDate()
+}
+
+/** Weekday (0=Sun) of the first day of the month. */
+export function firstWeekday(year: number, month0: number): number {
+  return new Date(year, month0, 1).getDay()
+}
+
+export const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December'
+]
