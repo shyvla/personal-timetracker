@@ -19,9 +19,6 @@
 .doing-view:focus {
   outline: none;
 }
-.doing-view__placeholder {
-  color: var(--muted);
-}
 
 .doing-input {
   margin: 0;

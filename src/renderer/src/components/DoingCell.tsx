@@ -6,6 +6,8 @@ export interface DoingCellProps {
   onSave: (text: string) => void
 }
 
+const AUTOSAVE_MS = 300
+
 function autoGrow(el: HTMLTextAreaElement): void {
   el.style.height = 'auto'
   el.style.height = `${el.scrollHeight}px`
@@ -14,14 +16,29 @@ function autoGrow(el: HTMLTextAreaElement): void {
 export default function DoingCell({ value, onSave }: DoingCellProps): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
-  const ref = useRef<HTMLTextAreaElement>(null)
 
+  const areaRef = useRef<HTMLTextAreaElement>(null)
+  const draftRef = useRef(value) // latest text (sync, for timers/unload)
+  const savedRef = useRef(value) // last text we've persisted
+  const editingRef = useRef(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onSaveRef = useRef(onSave)
   useEffect(() => {
-    setDraft(value)
+    onSaveRef.current = onSave
+  })
+
+  // Adopt external value changes (e.g. loading another day) — but never while
+  // editing, so an in-flight autosave can't overwrite what the user is typing.
+  useEffect(() => {
+    savedRef.current = value
+    if (!editingRef.current) {
+      draftRef.current = value
+      setDraft(value)
+    }
   }, [value])
 
   useEffect(() => {
-    const el = ref.current
+    const el = areaRef.current
     if (editing && el) {
       el.focus()
       el.setSelectionRange(el.value.length, el.value.length)
@@ -29,9 +46,44 @@ export default function DoingCell({ value, onSave }: DoingCellProps): React.JSX.
     }
   }, [editing])
 
-  function commit(): void {
+  function flush(): void {
+    if (timer.current) {
+      clearTimeout(timer.current)
+      timer.current = null
+    }
+    if (draftRef.current !== savedRef.current) {
+      savedRef.current = draftRef.current
+      onSaveRef.current(draftRef.current)
+    }
+  }
+
+  // Persist pending edits when the cell unmounts or the window closes.
+  useEffect(() => {
+    const onBeforeUnload = (): void => flush()
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      flush()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function update(text: string): void {
+    draftRef.current = text
+    setDraft(text)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(flush, AUTOSAVE_MS)
+  }
+
+  function beginEdit(): void {
+    editingRef.current = true
+    setEditing(true)
+  }
+
+  function endEdit(): void {
+    editingRef.current = false
     setEditing(false)
-    if (draft !== value) onSave(draft)
+    flush()
   }
 
   if (!editing) {
@@ -40,28 +92,34 @@ export default function DoingCell({ value, onSave }: DoingCellProps): React.JSX.
         className="doing-view"
         role="textbox"
         tabIndex={0}
-        onClick={() => setEditing(true)}
-        onFocus={() => setEditing(true)}
+        onClick={beginEdit}
+        onFocus={beginEdit}
       >
-        {value ? value : <span className="doing-view__placeholder">Add details…</span>}
+        {draft}
       </div>
     )
   }
 
   return (
     <textarea
-      ref={ref}
+      ref={areaRef}
       className="doing-input"
       value={draft}
       rows={1}
       onChange={(e) => {
-        setDraft(e.target.value)
+        update(e.target.value)
         autoGrow(e.target)
       }}
-      onBlur={commit}
+      onBlur={endEdit}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault()
+          endEdit()
+        } else if (e.key === 'Escape') {
+          e.preventDefault()
+          draftRef.current = value
           setDraft(value)
+          editingRef.current = false
           setEditing(false)
         }
       }}
