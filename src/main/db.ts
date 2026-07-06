@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { app } from 'electron'
 import type BetterSqlite3 from 'better-sqlite3'
-import { DEFAULT_PREFERENCES, type Preferences } from '../shared/types'
+import { DEFAULT_PREFERENCES, type Preferences, type Entry } from '../shared/types'
 
 // better-sqlite3 is a native module. We require it lazily so that a failure to
 // load (e.g. the native binary hasn't been rebuilt for Electron's ABI yet) does
@@ -85,4 +85,132 @@ export function setPreferences(prefs: Partial<Preferences>): Preferences {
   if (prefs.increment !== undefined) upsert.run('increment', String(prefs.increment))
   if (prefs.display !== undefined) upsert.run('display', prefs.display)
   return getPreferences()
+}
+
+// ---- Time entries ----
+//
+// Blocks are continuous: entry N's start equals entry N-1's end. Only the first
+// entry of a day carries a user-chosen start; every later entry supplies just an
+// end. We still persist start_min explicitly (denormalized) and re-chain later
+// entries — preserving their durations — whenever an earlier block changes.
+
+const DAY_END = 1440 // minutes in a day (midnight = end of day)
+
+interface EntryRow {
+  id: number
+  day: string
+  start_min: number
+  end_min: number
+  doing: string
+  position: number
+}
+
+function rowToEntry(r: EntryRow): Entry {
+  return {
+    id: r.id,
+    day: r.day,
+    startMin: r.start_min,
+    endMin: r.end_min,
+    doing: r.doing,
+    position: r.position,
+    tags: []
+  }
+}
+
+function dayRows(database: BetterSqlite3.Database, day: string): EntryRow[] {
+  return database
+    .prepare('SELECT * FROM entries WHERE day = ? ORDER BY position')
+    .all(day) as EntryRow[]
+}
+
+function validateRange(start: number, end: number): void {
+  if (start < 0 || end > DAY_END) throw new Error('Time must fall within the day')
+  if (end <= start) throw new Error('End time must be after the start time')
+}
+
+export function listEntries(day: string): Entry[] {
+  return dayRows(getDb(), day).map(rowToEntry)
+}
+
+/** Append a new block. The first block of a day needs a start; others chain. */
+export function createEntry(day: string, endMin: number, startMin?: number): Entry[] {
+  const database = getDb()
+  const rows = dayRows(database, day)
+  const position = rows.length
+  const start = position === 0 ? startMin : rows[rows.length - 1].end_min
+  if (start === undefined) throw new Error('The first block of the day needs a start time')
+  validateRange(start, endMin)
+  database
+    .prepare(
+      'INSERT INTO entries (day, start_min, end_min, doing, position) VALUES (?, ?, ?, ?, ?)'
+    )
+    .run(day, start, endMin, '', position)
+  return listEntries(day)
+}
+
+/**
+ * Change a block's time. For the first block, `startMin` is honored; for later
+ * blocks the start is forced to the previous block's end. Blocks after the edited
+ * one are shifted to stay continuous, keeping their original durations.
+ */
+export function updateEntryTime(
+  id: number,
+  patch: { startMin?: number; endMin?: number }
+): Entry[] {
+  const database = getDb()
+  const entry = database.prepare('SELECT * FROM entries WHERE id = ?').get(id) as
+    | EntryRow
+    | undefined
+  if (!entry) throw new Error('Entry not found')
+
+  const rows = dayRows(database, entry.day)
+  const idx = rows.findIndex((r) => r.id === id)
+  const newStart = idx === 0 ? patch.startMin ?? entry.start_min : rows[idx - 1].end_min
+  const newEnd = patch.endMin ?? entry.end_min
+  validateRange(newStart, newEnd)
+
+  const update = database.prepare(
+    'UPDATE entries SET start_min = ?, end_min = ? WHERE id = ?'
+  )
+  const tx = database.transaction(() => {
+    update.run(newStart, newEnd, id)
+    let prevEnd = newEnd
+    for (let j = idx + 1; j < rows.length; j++) {
+      const dur = rows[j].end_min - rows[j].start_min
+      const end = prevEnd + dur
+      if (end > DAY_END) throw new Error('Not enough time left in the day for later blocks')
+      update.run(prevEnd, end, rows[j].id)
+      prevEnd = end
+    }
+  })
+  tx()
+  return listEntries(entry.day)
+}
+
+/** Remove a block, then renumber positions and re-chain the remaining blocks. */
+export function deleteEntry(id: number): Entry[] {
+  const database = getDb()
+  const entry = database.prepare('SELECT day FROM entries WHERE id = ?').get(id) as
+    | { day: string }
+    | undefined
+  if (!entry) return []
+  const { day } = entry
+
+  const update = database.prepare(
+    'UPDATE entries SET position = ?, start_min = ?, end_min = ? WHERE id = ?'
+  )
+  const tx = database.transaction(() => {
+    database.prepare('DELETE FROM entries WHERE id = ?').run(id)
+    const rows = dayRows(database, day)
+    let prevEnd: number | null = null
+    rows.forEach((r, i) => {
+      const dur = r.end_min - r.start_min
+      const start = i === 0 || prevEnd === null ? r.start_min : prevEnd
+      const end = start + dur
+      update.run(i, start, end, r.id)
+      prevEnd = end
+    })
+  })
+  tx()
+  return listEntries(day)
 }

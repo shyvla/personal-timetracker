@@ -1,35 +1,36 @@
 import React, { useEffect, useState } from 'react'
-import type { Preferences } from '../../shared/types'
+import type { Entry, Preferences } from '../../shared/types'
 import { DEFAULT_PREFERENCES } from '../../shared/types'
+import { DAY_MINUTES, formatRange, incrementStep } from './lib/time'
+import { formatDisplayDate, todayISO } from './lib/date'
+import TimePopover from './components/TimePopover'
 import './styles/App.css'
 
-function formatDate(d: Date): string {
-  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`
+const MIN_ROWS = 8
+
+interface PopoverState {
+  anchor: DOMRect
+  kind: 'new' | 'edit'
+  entryId?: number
+  isFirst: boolean
+  initialStart: number
+  initialEnd: number
 }
 
-/** Placeholder rows so the table matches the mockup until entries are wired up. */
-const SAMPLE_ROWS = [
-  {
-    time: '9:00 AM – 10:00 AM',
-    doing: 'Leg day',
-    tags: [{ name: 'Gym', color: '#c9c9c9' }]
-  },
-  {
-    time: '11:00 AM – 12:00 PM',
-    doing:
-      'A banana is an elongated, edible fruit produced by large, treelike herbaceous plants. Botanically classified as a berry, it typically features a soft, sweet flesh enclosed in a thick rind.',
-    tags: [
-      { name: 'Bananana', color: '#d7d7d7' },
-      { name: 'Gym', color: '#c9c9c9' }
-    ]
-  }
-]
-
-const EMPTY_ROW_COUNT = 5
+/** Strip Electron's "Error invoking remote method …:" noise from IPC errors. */
+function ipcMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  const idx = raw.lastIndexOf('Error: ')
+  return idx >= 0 ? raw.slice(idx + 7) : raw
+}
 
 export default function App(): React.JSX.Element {
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFERENCES)
+  const [entries, setEntries] = useState<Entry[]>([])
+  const [day] = useState<string>(todayISO())
   const [dbError, setDbError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [popover, setPopover] = useState<PopoverState | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -41,18 +42,90 @@ export default function App(): React.JSX.Element {
           setDbError(status.error ?? 'Database unavailable')
           return
         }
-        const p = await window.api.getPreferences()
-        if (!cancelled) setPrefs(p)
+        const [p, e] = await Promise.all([
+          window.api.getPreferences(),
+          window.api.listEntries(day)
+        ])
+        if (cancelled) return
+        setPrefs(p)
+        setEntries(e)
       } catch (err) {
-        if (!cancelled) setDbError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) setDbError(ipcMessage(err))
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [day])
 
-  const today = formatDate(new Date())
+  function openNew(e: React.MouseEvent<HTMLElement>): void {
+    const isFirst = entries.length === 0
+    const step = incrementStep(prefs.increment)
+    const block = prefs.increment === 'custom' ? 60 : step
+    const start = isFirst ? 9 * 60 : entries[entries.length - 1].endMin
+    const end = Math.min(start + block, DAY_MINUTES)
+    setActionError(null)
+    setPopover({
+      anchor: e.currentTarget.getBoundingClientRect(),
+      kind: 'new',
+      isFirst,
+      initialStart: start,
+      initialEnd: end
+    })
+  }
+
+  function openEdit(e: React.MouseEvent<HTMLElement>, entry: Entry, idx: number): void {
+    setActionError(null)
+    setPopover({
+      anchor: e.currentTarget.getBoundingClientRect(),
+      kind: 'edit',
+      entryId: entry.id,
+      isFirst: idx === 0,
+      initialStart: entry.startMin,
+      initialEnd: entry.endMin
+    })
+  }
+
+  async function handleSaveTime(
+    startMin: number | undefined,
+    endMin: number
+  ): Promise<void> {
+    if (!popover) return
+    try {
+      const list =
+        popover.kind === 'new'
+          ? await window.api.createEntry(day, endMin, startMin)
+          : await window.api.updateEntryTime(popover.entryId as number, { startMin, endMin })
+      setEntries(list)
+      setPopover(null)
+      setActionError(null)
+    } catch (err) {
+      setActionError(ipcMessage(err))
+    }
+  }
+
+  async function handleDelete(): Promise<void> {
+    if (!popover?.entryId) return
+    try {
+      const list = await window.api.deleteEntry(popover.entryId)
+      setEntries(list)
+      setPopover(null)
+      setActionError(null)
+    } catch (err) {
+      setActionError(ipcMessage(err))
+    }
+  }
+
+  async function handleSavePrefs(patch: Partial<Preferences>): Promise<void> {
+    try {
+      const p = await window.api.setPreferences(patch)
+      setPrefs(p)
+    } catch (err) {
+      setActionError(ipcMessage(err))
+    }
+  }
+
+  const padCount = Math.max(0, MIN_ROWS - entries.length - 1)
 
   return (
     <div className="app">
@@ -72,7 +145,7 @@ export default function App(): React.JSX.Element {
         <div className="sheet__toolbar">
           <button className="datepill" type="button">
             <CalendarIcon />
-            <span className="datepill__date">{today}</span>
+            <span className="datepill__date">{formatDisplayDate(day)}</span>
           </button>
           <button className="export-btn" type="button">
             Export
@@ -92,32 +165,38 @@ export default function App(): React.JSX.Element {
             </div>
           </div>
 
-          {SAMPLE_ROWS.map((row, i) => (
-            <div className="tr" role="row" key={i}>
-              <div className="td td--time" role="cell">
-                {row.time}
-              </div>
+          {entries.map((entry, idx) => (
+            <div className="tr" role="row" key={entry.id}>
+              <button
+                type="button"
+                className="td td--time td--clickable"
+                onClick={(e) => openEdit(e, entry, idx)}
+              >
+                {formatRange(entry.startMin, entry.endMin, prefs.display)}
+              </button>
               <div className="td td--doing" role="cell">
-                {row.doing}
+                {entry.doing}
               </div>
-              <div className="td td--tag" role="cell">
-                <div className="tags">
-                  {row.tags.map((t, j) => (
-                    <span
-                      className="tag"
-                      key={j}
-                      style={{ backgroundColor: t.color }}
-                    >
-                      {t.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              <div className="td td--tag" role="cell" />
             </div>
           ))}
 
-          {Array.from({ length: EMPTY_ROW_COUNT }).map((_, i) => (
-            <div className="tr tr--empty" role="row" key={`empty-${i}`}>
+          {!dbError && (
+            <div className="tr" role="row">
+              <button
+                type="button"
+                className="td td--time td--clickable td--add"
+                onClick={openNew}
+              >
+                <span className="td--add__hint">+ Add time</span>
+              </button>
+              <div className="td td--doing" role="cell" />
+              <div className="td td--tag" role="cell" />
+            </div>
+          )}
+
+          {Array.from({ length: padCount }).map((_, i) => (
+            <div className="tr tr--empty" role="row" key={`pad-${i}`}>
               <div className="td td--time" role="cell" />
               <div className="td td--doing" role="cell" />
               <div className="td td--tag" role="cell" />
@@ -131,6 +210,25 @@ export default function App(): React.JSX.Element {
         {typeof prefs.increment === 'number' ? ' min' : ''} · Display:{' '}
         {prefs.display === 'ampm' ? 'AM/PM' : 'Military'}
       </footer>
+
+      {popover && (
+        <TimePopover
+          anchor={popover.anchor}
+          isFirst={popover.isFirst}
+          initialStart={popover.initialStart}
+          initialEnd={popover.initialEnd}
+          prefs={prefs}
+          canDelete={popover.kind === 'edit'}
+          error={actionError}
+          onSaveTime={handleSaveTime}
+          onDelete={handleDelete}
+          onSavePrefs={handleSavePrefs}
+          onClose={() => {
+            setPopover(null)
+            setActionError(null)
+          }}
+        />
+      )}
     </div>
   )
 }

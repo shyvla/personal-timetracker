@@ -1,11 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Preferences, DbStatus } from '../shared/types'
+import type { Preferences, DbStatus, Entry } from '../shared/types'
 
 const api = {
   dbStatus: (): Promise<DbStatus> => ipcRenderer.invoke('db:status'),
   getPreferences: (): Promise<Preferences> => ipcRenderer.invoke('prefs:get'),
   setPreferences: (prefs: Partial<Preferences>): Promise<Preferences> =>
-    ipcRenderer.invoke('prefs:set', prefs)
+    ipcRenderer.invoke('prefs:set', prefs),
+  listEntries: (day: string): Promise<Entry[]> => ipcRenderer.invoke('entries:list', day),
+  createEntry: (day: string, endMin: number, startMin?: number): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:create', day, endMin, startMin),
+  updateEntryTime: (
+    id: number,
+    patch: { startMin?: number; endMin?: number }
+  ): Promise<Entry[]> => ipcRenderer.invoke('entries:updateTime', id, patch),
+  deleteEntry: (id: number): Promise<Entry[]> => ipcRenderer.invoke('entries:delete', id)
 }
 
 export type Api = typeof api
