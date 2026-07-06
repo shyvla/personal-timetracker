@@ -109,10 +109,13 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   background: var(--sheet-bg);
-  border-radius: 15px;
+  /* No border-radius here: the rounded frame (.table) supplies the corners.
+     A rounded scroll box would clip the square sticky header, leaving white
+     slivers above it — the "pop of white" artifact. */
 }
 
 /* Ruled empty space below the last row: horizontal separators every row-height
