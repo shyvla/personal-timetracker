@@ -26,7 +26,10 @@
 /* ---- The white "sheet" card ---- */
 .sheet {
   flex: 1 1 auto;
-  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   margin: 0 32px 28px;
   padding: 28px 44px 40px;
   background: var(--sheet-bg);
@@ -87,7 +90,12 @@
 }
 
 /* ---- Table ---- */
+/* Hug content when short; when it can't fit the sheet, cap and scroll the
+   rows internally (the sticky header stays put) instead of the whole page. */
 .table {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   background: var(--table-shell);
   border-radius: var(--radius-table);
   padding: 8px;
@@ -101,6 +109,10 @@
 }
 
 .table__head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--table-shell);
   border-bottom: 1px solid var(--line-strong);
 }
 
