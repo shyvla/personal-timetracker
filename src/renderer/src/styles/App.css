@@ -113,9 +113,10 @@
   display: flex;
   flex-direction: column;
   background: var(--sheet-bg);
-  /* No border-radius here: the rounded frame (.table) supplies the corners.
-     A rounded scroll box would clip the square sticky header, leaving white
-     slivers above it — the "pop of white" artifact. */
+  /* Round to match the frame's inner (padding-box) corners: 22px frame radius
+     minus 8px frame padding = 14px. The sticky header's top corners are
+     rounded to match (below) so no white sliver shows above it. */
+  border-radius: 14px;
 }
 
 /* Ruled empty space below the last row: horizontal separators every row-height
@@ -124,7 +125,10 @@
 .table__filler {
   flex: 1 1 auto;
   min-height: 0;
-  background-image: linear-gradient(to bottom, transparent 63px, var(--line) 63px),
+  /* Horizontal rule at the TOP of each 64px tile so the first divider sits
+     directly under the add row (matching a standard row height), plus the two
+     column dividers at 220px / (100% - 300px). */
+  background-image: linear-gradient(to bottom, var(--line) 1px, transparent 1px),
     linear-gradient(var(--line), var(--line)), linear-gradient(var(--line), var(--line));
   background-size:
     100% 64px,
@@ -149,6 +153,8 @@
   top: 0;
   z-index: 2;
   background: var(--sheet-bg);
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
   border-bottom: 1px solid var(--line-strong);
 }
 
