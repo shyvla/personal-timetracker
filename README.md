@@ -1,10 +1,22 @@
 # Personal Time Tracker
 
-WHere is your time going? Occasionally, I like to audit my life by obsessively tracking what I spend every minute doing.
+Where is your time going? Occasionally, I like to audit my life by obsessively tracking what I spend every minute doing.
 
 The personal time tracker is a local-first desktop app for logging continuous time blocks throughout your day. Each day has its own timesheet of entries — a start/end time, a free-text description of what you were doing, and any number of colored tags. Everything is stored locally in SQLite; nothing leaves your machine.
 
 Built with Electron, React, and TypeScript.
+
+### Iteration 1
+
+Initial Claude prompting + Figma lofi input.
+
+Built skeleton then feature by feature.
+
+Made small adjustments along the way.
+
+Had some minor issues with UI scrolling.
+
+Next steps: Hifi-redesign, export time-block durations.
 
 ## Features
 
