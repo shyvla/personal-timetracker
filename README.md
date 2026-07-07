@@ -10,7 +10,7 @@ Built with Electron, React, and TypeScript.
 
 Initial Claude prompting + Figma lofi input.
 
-Built skeleton then feature by feature.
+Built skeleton then added feature by feature functionality.
 
 Made small adjustments along the way.
 
